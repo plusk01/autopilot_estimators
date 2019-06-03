@@ -58,9 +58,12 @@ The rotation matrix $R^A_B$ is the global-to-local rotation of $\{B\}$ w.r.t $\{
 With this problem geometry, we write the measurements received by the IMU below.
 
 \subsection*{Accelerometer}
-Accelerometers measure specific the instantaneous linear acceleration (really the specific force) minus the force of the (conservative) gravitational field $\bm{F}_g = -g\bm{e}_3$.
+Accelerometers do not measure gravity.
+Instead, an accelerometer measures the \textit{specific force} (i.e., $\bm{F}/m$) that prevents free fall.
+Thus, an accelerometer in free fall would measure $0$, while an accelerometer sitting on a table would measure the normal force that is preventing free fall.
+the instantaneous linear acceleration (really the specific force) minus the acceleration due to the (conservative) gravitational field $-g\bm{e}_3$.
 \begin{equation}
-    \bm{a} = \left(R^A_B\right)^\top (\ddot{\bm r} - \bm{F}_g) + \bm{\nu} + \bm{b}_a,
+    \bm{a} = \left(R^A_B\right)^\top (\ddot{\bm r} + g\bm{e}_3) + \bm{\nu} + \bm{b}_a,
 \end{equation}
 where $\bm{\nu}$ is zero-mean Gaussian noise with variance $\Sigma^2_a$ and $\bm{b}_a$ is a bias term.
 Accelerometers typically have a sample rate of 500 Hz or 1 kHz and 
