@@ -1,0 +1,92 @@
+%!TEX TS-program = xelatex
+%!TEX encoding = UTF-8 Unicode
+
+\documentclass[a4paper]{article}
+
+\usepackage{xltxtra}
+\usepackage{amsfonts}
+\usepackage{polyglossia}
+\usepackage{fancyhdr}
+\usepackage{geometry}
+\usepackage{dsfont}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{amssymb}
+\usepackage{physics}
+\usepackage{mathtools}
+\usepackage{bm}
+
+\geometry{a4paper,left=15mm,right=15mm,top=20mm,bottom=20mm}
+\pagestyle{fancy}
+\lhead{Parker C. Lusk}
+\chead{Autopilot Estimators}
+\rhead{\today}
+\cfoot{\thepage}
+
+\setlength{\headheight}{23pt}
+\setlength{\parindent}{0.0in}
+\setlength{\parskip}{0.0in}
+
+\newtheorem*{prop}{Proposition}
+\newtheorem*{defn}{Definition}
+\newtheorem*{thm}{Theorem}
+\newtheorem*{cor}{Corollary}
+\newtheorem*{lem}{Lemma}
+\newtheorem*{rem}{Remark}
+
+\DeclarePairedDelimiterX{\inn}[2]{\langle}{\rangle}{#1, #2}
+
+\begin{document}
+\section*{Overview}
+High-level autonomy requires confidence in low-level control and estimation.
+Autopilot firmware can use an inertial measurement unit (IMU) with three orthogonal rate gyroscopes and three orthogonal accelerometers to perform estimation.
+If sensors were perfect, the estimator would simply integrate the gyro measurements to obtain an estimate of the attitude.
+However, gyros tend to drift over time due to bias.
+The accelerometer can be used to correct the drift in the roll and pitch axes, however yaw bias is unobservable with an IMU alone.
+This document explores various schemes and implementations of attitude estimation using an IMU, with occasional external attitude updates from vision, motion capture, or some other source.
+
+\section*{IMU Model}
+With the advent of micro electro-mechanical systems (MEMS), the scale of IMUs has decreased significantly over the years.
+In particular, the spread of small MEMS IMUs is in part due to the proliferation of smart phones and wearable electronics.
+
+To understand the IMU model, consider a rigid body $\{B\}$ with a position $\bm{r}$ expressed in an inertial frame $\{A\}$.
+An IMU is `strapped down' to the origin of the rigid body and is axis aligned with it.
+In other words, the IMU sensor frame $\{S\}$ is identified with the body frame $\{B\}$.
+Unless otherwise stated, we will make use of the East-North-Up (ENU) inertial frame with its corresponding Front-Left-Up (FLU) body frame.
+The rotation matrix $R^A_B$ is the global-to-local rotation of $\{B\}$ w.r.t $\{A\}$ and it takes data from $\{B\}$ into $\{A\}$.
+
+With this problem geometry, we write the measurements received by the IMU below.
+
+\subsection*{Accelerometer}
+Accelerometers measure specific the instantaneous linear acceleration (really the specific force) minus the force of the (conservative) gravitational field $\bm{F}_g = -g\bm{e}_3$.
+\begin{equation}
+    \bm{a} = \left(R^A_B\right)^\top (\ddot{\bm r} - \bm{F}_g) + \bm{\nu} + \bm{b}_a,
+\end{equation}
+where $\bm{\nu}$ is zero-mean Gaussian noise with variance $\Sigma^2_a$ and $\bm{b}_a$ is a bias term.
+Accelerometers typically have a sample rate of 500 Hz or 1 kHz and 
+
+\subsection*{Rate Gyro}
+The measured angular rates $\bm{\omega} = \begin{bmatrix}p&q&r\end{bmatrix}^\top$ are the body rates of the vehicle with respect to the inertial frame, expressed in the body frame and is written as
+\begin{equation}
+    \bm{\omega} = \bm{\omega}_\text{true} + \bm{\eta} + \bm{b},
+\end{equation}
+where $\bm{\eta}$ is zero-mean Gaussian noise with variance $\Sigma^2_\omega$ and $\bm{b}$ is constant or slowly time-varying bias (i.e., $\dot{\bm b}\approx 0)$.
+
+Gyros typically have a sample rate of 500 Hz, 1 kHz, or 8 kHz and are great at capturing high-frequency dynamics and are incredibly useful, especially over small time windows.
+However, due to the low-frequency bias $\bm{b}$, simply integrating gyros over long timescales is unwise (e.g., more than tens of seconds).
+
+\subsubsection*{Allan Variance}
+\subsubsection*{AR(n) Model}
+
+\section*{Complementary Filter}
+One of the most basic estimators is the \textit{complementary filter}, also known as the \textit{balance filter} (Shane Colton, 2007).
+The motivating principle is that gyros are good at capturing high-frequency dynamics, but have a low-frequency drift.
+On the otherhand, accelerometers tend to have high-frequency noise (e.g., from non-smooth movement).
+Further, when the system that the IMU is attached to has actuators (like a multirotor), 
+
+\section*{Mahony's Nonlinear Complementary Filter}
+One of the more popular estimators is Mahony's nonlinear complementary filter on $\mathrm{SO}(3)$.
+
+
+
+\end{document}
