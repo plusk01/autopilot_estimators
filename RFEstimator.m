@@ -121,29 +121,24 @@ classdef RFEstimator
                 % Correction term
                 w_acc(1) = -2*q_tilde(1)*q_tilde(2);
                 w_acc(2) = -2*q_tilde(1)*q_tilde(3);
-                w_acc(3) = 0; % don't correct unobservable z
+%                 w_acc(3) = 0; % don't correct unobservable z
 %                 w_acc(3) = -2*q_tilde(1)*q_tilde(4);
-                
+
                 obj.wacc = w_acc;
-                obj.wacc_alt = obj.calcMahonyCorrection(a);
-                
-%                 w_acc = 2*obj.wacc_alt;
+
+%                 w_acc = 0.1*Q.boxminus(q_acc_inv, obj.q)';
 %                 w_acc(3) = 0;
                 
-                % integrate biases from accel feedback
-                if norm(gyro) < obj.SPIN_RATE_LIMIT
-                    % only integrate if not spinning too fast
-                    obj.bias(1) = obj.bias(1) - obj.ki*w_acc(1)*dt;
-                    obj.bias(2) = obj.bias(2) - obj.ki*w_acc(2)*dt;
-%                     obj.bias(3) = 0;
-                    obj.bias(3) = obj.bias(3) - obj.ki*w_acc(3)*dt;
-                end
-                
-                bias = obj.bias;
-            else
-                w_acc = [0;0;0];
-                bias = [0;0;0];
-                
+%                 [u, theta] = Q(q_tilde).toAxisAngle();
+%                 w_acc = theta*u;
+%                 w_acc(3) = 0;
+
+                w_acc = 2*obj.calcMahonyCorrection(a);
+%                 w_acc(3) = 0;
+
+                obj.wacc_alt = w_acc;
+
+            else                
                 fprintf('Skipped! accel mag: %.2f\n', norm(accel));
             end
             
@@ -155,29 +150,54 @@ classdef RFEstimator
             end
             if obj.extAttFlag == 1
                 obj.extAttFlag = 0;
+                
+                q_tilde = Q(Q.inv(obj.q)).mult(obj.extAttq).q;
+                
+                % Correction term
+                err = 2*q_tilde(1)*q_tilde(2:4)';
 
                 % rosflight way
-                err = Q.boxminus(obj.q, obj.extAttq);
+%                 err = Q.boxminus(obj.q, obj.extAttq);
 %                 err = rosflight.utils.boxminus(obj.extAttq, obj.q);
+                
+                [u, theta] = Q(q_tilde).toAxisAngle();
+%                 err = theta*u;
+                
+                % gross way
+%                 err = obj.q(2:4) - obj.extAttq(2:4);
 
-                % other way
-                qtilde = Q(Q.inv(obj.q)).mult(obj.extAttq).q;
-%                 qtilde = Q(obj.q).mult(Q.inv(obj.extAttq)).q;
-%                 err = 2*qtilde(1)*qtilde(2:4);
+%                 Rtilde = Q(obj.q).toRotm()'*Q(obj.extAttq).toRotm();
+%                 Pa = 0.5*(Rtilde - Rtilde.');
+%                 err = [Pa(3,2);Pa(1,3);Pa(2,1)];
                 
-                [u, theta] = Q(qtilde).toAxisAngle();
-                err = theta*u;
+                % betaflight/Leishman vector way
+                R = Q(obj.q).toRotm();
+                Rext = Q(obj.extAttq).toRotm();
+                err = -cross(R(3,:)', Rext(3,:)');
+                err(3) = 0;
+                
+                err2 = -cross(R(1,:)', Rext(1,:)');
+                err2(1) = 0;
+                err = err + err2;
+                
+                err3 = -cross(R(2,:)', Rext(2,:)');
+                err3(2) = 0;
+                err = err + err3;
 
-                % betaflight accel / mag way
-                
-                
-%                 w_acc = 0;
+                obj.wacc_alt = err;
+
                 w_acc = w_acc + obj.extAttKp*err;
-%                 obj.bias = [0;0;0];
                 fprintf('[MATLAB] extAtt err: %.4f, %.4f, %.4f\n', err(1), err(2), err(3));
             end
             
-            bias = obj.bias;
+            % integrate biases from accel feedback
+            if norm(gyro) < obj.SPIN_RATE_LIMIT
+                % only integrate if not spinning too fast
+                obj.bias(1) = obj.bias(1) - obj.ki*w_acc(1)*dt;
+                obj.bias(2) = obj.bias(2) - obj.ki*w_acc(2)*dt;
+%                 obj.bias(3) = 0;
+                obj.bias(3) = obj.bias(3) - obj.ki*w_acc(3)*dt;
+            end
             
             % handle gyro measurements
             if obj.quadInt
@@ -188,8 +208,11 @@ classdef RFEstimator
                 wbar = gyro;
             end
             
+%             wbar = zeros(3,1);
+%             wbar(3) = 0;
+            
             % build the composite omega vector for kinematic propagation
-            wfinal = wbar - bias + obj.kp*w_acc;
+            wfinal = wbar - obj.bias + obj.kp*w_acc;
             
             % propagate dynamics (only if we've moved)
             if norm(wfinal) > 0

@@ -11,8 +11,8 @@ clear all; clc;
 % Setup
 
 % Load flight data
-% [imu, state, pose, frame] = readACLBag('HX05', 'bags/acl/imu.bag');
-[imu, state, pose, frame] = readRFBag('bags/acl/unity.bag');
+[imu, state, pose, frame] = readACLBag('HX02', 'bags/acl/imu_hx02.bag');
+% [imu, state, pose, frame] = readRFBag('bags/acl/unity_bigdrag.bag');
 % [imu, state, pose, frame] = readRFBag('bags/rrg/rosflight_some_yaw.bag', 1);
 
 % timing - use IMU as clock
@@ -44,15 +44,20 @@ grid on; ylabel('Accel [m/s/s]'); xlabel('Time [s]');
 % -------------------------------------------------------------------------
 % Filter Setup
 
+kp = 0.5; ki = 0.05; margin = 0.2; acc_LPF_alpha = 0.8;
+useExtAtt = 1;
+useAcc = 1;
+
 %
 % Mahony Filter
 %
-kp = 0.5; ki = 0.0; margin = 0.2; acc_LPF_alpha = 0.8;
+
 filter = MahonyAHRS(kp, ki, 1, margin, acc_LPF_alpha);
 filter.frame = frame;
 
 % initialize with quat from vicon
 filter = filter.setQ(pose.quaternion(:,pNs));
+% filter = filter.setQ(Q.fromRPY(0.0,0.0,0.9).q);
 
 qmahony = zeros(4,length(tvec));
 qmahony(:,1) = filter.getQ();
@@ -66,7 +71,7 @@ mahonyintegral = zeros(3,length(tvec));
 
 rf = rosflight.ROSflight();
 rf.frame = frame;
-rf.setParam('FILTER_USE_ACC', 1);
+rf.setParam('FILTER_USE_ACC', useAcc);
 rf.setParam('FILTER_QUAD_INT', 0);
 rf.setParam('FILTER_MAT_EXP', 0);
 rf.setParam('FILTER_KP', kp);
@@ -77,7 +82,7 @@ rf.setParam('GYROZ_LPF_ALPHA', 0.0);
 rf.setParam('GYRO_X_BIAS', 0);
 rf.setParam('GYRO_Y_BIAS', 0);
 rf.setParam('GYRO_Z_BIAS', 0);
-rf.setParam('FILTER_KP_COR', 10);
+rf.setParam('FILTER_KP_COR', 40);
 rf.setTime(tvec(1));
 rf.run();
 
@@ -94,7 +99,8 @@ rfestimator = RFEstimator(rf, margin);
 rfestimator.frame = frame;
 
 % initialize with quat from vicon
-rfestimator = rfestimator.setQ(pose.quaternion(:,pNs));
+% rfestimator = rfestimator.setQ(pose.quaternion(:,pNs));
+rfestimator = rfestimator.setQ(Q.fromRPY(0.0,0.0,0).q);
 
 qrfe = zeros(4,length(tvec));
 qrfe(:,1) = rfestimator.getQ();
@@ -109,6 +115,12 @@ rfbias = zeros(3,length(tvec));
 % estimator period over time
 dts = zeros(1,length(tvec)-1);
 
+% vis handle for attitude
+figure(10), clf; hold on;
+hViz = viz(Q.Identity, Q.Identity, Q.Identity, zeros(3,1), margin, frame, []);
+
+extAttTimes = zeros(1,length(tvec));
+
 for i = 2:length(tvec)
     t = tvec(i);
     dt = t - tvec(i-1);
@@ -119,8 +131,7 @@ for i = 2:length(tvec)
     
     % find the time-sync'd index of the pose data
     pidx = find(pose.t>=t,1);
-%     if abs(pose.t(pidx)-t)>0.001, pidx = 0; end % within 1 ms tolerance
-    pidx = 0;
+    if isempty(pidx), pidx = 0; end
     
     %
     % MATLAB Implementation of Mahony Filter
@@ -135,7 +146,7 @@ for i = 2:length(tvec)
     % ROSflight
     %
     
-    if pidx ~= 0
+    if pidx ~= 0 && useExtAtt == 1
         extAttq = pose.quaternion(:,pidx);
         rf.extAttCorrection(extAttq);
     end
@@ -153,7 +164,8 @@ for i = 2:length(tvec)
     % ROSflight MATLAB estimator
     %
     
-    if pidx ~= 0
+    if pidx ~= 0 && useExtAtt == 1 && mod(i,20) == 0
+        extAttTimes(i) = 1;
         extAttq = pose.quaternion(:,pidx);
         rfestimator = rfestimator.extAttCorrection(extAttq);
     end
@@ -164,6 +176,13 @@ for i = 2:length(tvec)
     walt(:,i) = [1 0 0; 0 -1 0; 0 0 -1]*rfestimator.wacc_alt;
     rfbias(:,i) = [1 0 0; 0 -1 0; 0 0 -1]*(-1)*rfestimator.bias;
     
+    
+    % Visualize attitude and accelerometer measurement
+    if pidx ~= 0 && mod(i,1000) == 0
+        hViz = viz(qrfe(:,i), qmahony(:,i), pose.quaternion(:,pidx), ...
+                        rfestimator.accel_LPF, margin, frame, hViz);
+        drawnow;
+    end
 end
 
 % -------------------------------------------------------------------------
@@ -225,6 +244,9 @@ plot(tvec,mahonyRPY(:,3));
 % plot(rfstate.t,rfstate.RPY(3,:)*180/pi);
 plot(tvec,rfeRPY(:,3));
 xlabel('Time [s]');
+
+% I = find(extAttTimes==1);
+% scatter(tvec(I),repmat(-7,length(I),1),5)
 
 figure(4), clf;
 subplot(311); grid on; ylabel('halfe'); hold on;
