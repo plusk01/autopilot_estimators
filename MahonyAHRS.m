@@ -114,10 +114,6 @@ classdef MahonyAHRS
                     obj.integralFBx = obj.integralFBx + twoKi*halfex*dt;
                     obj.integralFBy = obj.integralFBy + twoKi*halfey*dt;
                     obj.integralFBz = obj.integralFBz + twoKi*halfez*dt;
-                    % apply integral feedback
-                    gx = gx + obj.integralFBx;
-                    gy = gy + obj.integralFBy;
-                    gz = gz + obj.integralFBz;
                 else
                     % prevent integral windup
                     obj.integralFBx = 0;
@@ -133,6 +129,12 @@ classdef MahonyAHRS
                 fprintf('Skipped! accel mag: %.2f\n', norm(accel));
             end
             
+            % apply integral feedback (n.b. MahonyAHRS does this wrong,
+            % betaflight moved it here, correctly so)
+            gx = gx + obj.integralFBx;
+            gy = gy + obj.integralFBy;
+            gz = gz + obj.integralFBz;
+
             % Integrate rate of change of quaternion
             gx = gx * (0.5*dt); % pre-multiply common factors
             gy = gy * (0.5*dt);
