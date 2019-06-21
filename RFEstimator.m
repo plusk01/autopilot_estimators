@@ -116,6 +116,10 @@ classdef RFEstimator
             % attitude correction term using accelerometer
             w_acc = [0;0;0];
             
+            % flags for which measurement was used
+            usedAccel = 0;
+            usedExtAtt = 0;
+            
             % compute feedback only if accelerometer measurement valid
             if obj.useAcc && ...
                     lowerbound < norm(accel) && norm(accel) < upperbound
@@ -158,6 +162,7 @@ obj.wacc_alt = w_acc;
 
 %                 obj.wacc_alt = w_acc;
 
+                usedAccel = 1;
             else                
                 fprintf('Skipped! accel mag: %.2f\n', norm(accel));
             end
@@ -194,21 +199,23 @@ obj.wacc_alt = w_acc;
                 R = Q(obj.q).toRotm();
                 Rext = Q(obj.extAttq).toRotm();
                 err = -cross(R(3,:)', Rext(3,:)');
-                err(3) = 0;
+%                 err(3) = 0;
                 
                 err2 = -cross(R(1,:)', Rext(1,:)');
-                err2(1) = 0;
+%                 err2(1) = 0;
                 err = err + err2;
                 
                 err3 = -cross(R(2,:)', Rext(2,:)');
-                err3(2) = 0;
+%                 err3(2) = 0;
                 err = err + err3;
 
                 obj.wacc_alt = err;
 
-%                 w_acc = [0;0;0];
+                w_acc = [0;0;0];
                 w_acc = w_acc + obj.extAttKp*err;
                 fprintf('[MATLAB] extAtt err: %.4f, %.4f, %.4f\n', err(1), err(2), err(3));
+                
+                usedExtAtt = 1;
             end
             
             % integrate biases from accel feedback
@@ -232,8 +239,12 @@ obj.wacc_alt = w_acc;
 %             wbar = zeros(3,1);
 %             wbar(3) = 0;
             
+            % select gain
+            kp = obj.kp;
+            if usedExtAtt == 1, kp = 1.5; end
+
             % build the composite omega vector for kinematic propagation
-            wfinal = wbar - obj.bias + obj.kp*w_acc;
+            wfinal = wbar - obj.bias + kp*w_acc;
 %             wfinal = wbar + obj.kp*w_acc;
             
             % propagate dynamics (only if we've moved)

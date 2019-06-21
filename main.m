@@ -6,6 +6,7 @@
 % 21 May 2019
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 clear all; clc;
+set(0,'DefaultLineLineWidth',1); % 0.5
 
 % -------------------------------------------------------------------------
 % Setup
@@ -46,8 +47,11 @@ grid on; ylabel('Accel [m/s/s]'); xlabel('Time [s]');
 % Filter Setup
 
 kp = 0.5; ki = 0.05; margin = 0.2; acc_LPF_alpha = 0.8;
-useExtAtt = 0; extAttRate = 400;
+useExtAtt = 1; extAttRate = 100;
 useAcc = 1;
+
+% ratio of imu sample rate to extAtt sample rate
+freqRat = (length(tvec)/max(tvec))/extAttRate;
 
 %
 % Mahony Filter
@@ -83,7 +87,7 @@ rf.setParam('GYROZ_LPF_ALPHA', 0.0);
 rf.setParam('GYRO_X_BIAS', 0);
 rf.setParam('GYRO_Y_BIAS', 0);
 rf.setParam('GYRO_Z_BIAS', 0);
-rf.setParam('FILTER_KP_COR', 40);
+rf.setParam('FILTER_KP_COR', clamp(freqRat,200));
 rf.setTime(tvec(1));
 rf.run();
 
@@ -123,7 +127,7 @@ if viz == 1
     hViz = viz(Q.Identity, Q.Identity, Q.Identity, zeros(3,1), margin, frame, []);
 end
 
-extAttTimes = zeros(1,length(tvec));
+extAttFlags = zeros(1,length(tvec));
 
 for i = 2:length(tvec)
     t = tvec(i);
@@ -158,7 +162,10 @@ for i = 2:length(tvec)
     % ROSflight
     %
     
-    if pidx ~= 0 && useExtAtt == 1 && mod(i,extAttRate) == 0
+    extAttFlag = mod(i,round(freqRat)) == 0;
+    if extAttRate == Inf, extAttFlag = 1; end
+    
+    if pidx ~= 0 && useExtAtt == 1 && extAttFlag == 1
         extAttq = pose.quaternion(:,pidx);
         rf.extAttCorrection(extAttq);
     end
@@ -176,8 +183,11 @@ for i = 2:length(tvec)
     % ROSflight MATLAB estimator
     %
     
-    if pidx ~= 0 && useExtAtt == 1 && mod(i,extAttRate) == 0
-        extAttTimes(i) = 1;
+    extAttFlag = mod(i,round(freqRat)) == 0;
+    if extAttRate == Inf, extAttFlag = 1; end
+    
+    if pidx ~= 0 && useExtAtt == 1 && extAttFlag == 1
+        extAttFlags(i) = 1;
         extAttq = pose.quaternion(:,pidx);
         rfestimator = rfestimator.extAttCorrection(extAttq, t);
     end
@@ -202,25 +212,25 @@ end
 figure(2), clf;
 subplot(411); grid on; ylabel('qw'); hold on; legend;
 plot(pose.t(pNs:pNe),pose.quaternion(1,pNs:pNe),'DisplayName','VICON');
-plot(state.t(sNs:sNe),state.quat(1,sNs:sNe),'DisplayName','Onboard');
+% plot(state.t(sNs:sNe),state.quat(1,sNs:sNe),'DisplayName','Onboard');
 plot(tvec,qmahony(1,:),'DisplayName','Mahony');
 % plot(rfstate.t, rfstate.q(1,:),'DisplayName','ROSflight');
 plot(tvec, qrfe(1,:),'DisplayName','ROSflight MATLAB');
 subplot(412); grid on; ylabel('qx'); hold on;
 plot(pose.t(pNs:pNe),pose.quaternion(2,pNs:pNe));
-plot(state.t(sNs:sNe),state.quat(2,sNs:sNe));
+% plot(state.t(sNs:sNe),state.quat(2,sNs:sNe));
 plot(tvec,qmahony(2,:));
 % plot(rfstate.t, rfstate.q(2,:));
 plot(tvec, qrfe(2,:));
 subplot(413); grid on; ylabel('qy'); hold on;
 plot(pose.t(pNs:pNe),pose.quaternion(3,pNs:pNe));
-plot(state.t(sNs:sNe),state.quat(3,sNs:sNe));
+% plot(state.t(sNs:sNe),state.quat(3,sNs:sNe));
 plot(tvec,qmahony(3,:))
 % plot(rfstate.t, rfstate.q(3,:));
 plot(tvec, qrfe(3,:));
 subplot(414); grid on; ylabel('qz'); hold on;
 plot(pose.t(pNs:pNe),pose.quaternion(4,pNs:pNe));
-plot(state.t(sNs:sNe),state.quat(4,sNs:sNe));
+% plot(state.t(sNs:sNe),state.quat(4,sNs:sNe));
 plot(tvec,qmahony(4,:));
 % plot(rfstate.t, rfstate.q(4,:));
 plot(tvec, qrfe(4,:));
@@ -258,8 +268,8 @@ plot(tvec,mahonyRPY(:,3));
 plot(tvec,rfeRPY(:,3));
 xlabel('Time [s]');
 
-I = find(extAttTimes==1);
-scatter(tvec(I),repmat(-7,length(I),1),5)
+I = find(extAttFlags==1);
+scatter(tvec(I),repmat(-7,length(I),1),2)
 
 figure(4), clf;
 subplot(311); grid on; ylabel('halfe'); hold on;
@@ -274,3 +284,8 @@ subplot(211); grid on; ylabel('MahonyAHRS'); hold on;
 plot(tvec, mahonyintegral); legend('X','Y','Z'); title('Integral Feedback (Bias)');
 subplot(212); grid on; ylabel('ROSflight'); hold on;
 plot(tvec, rfbias);
+
+function v = clamp(v,u)
+    if v>u, v=u; end
+    if v<-u,v=-u; end
+end
