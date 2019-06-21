@@ -294,7 +294,7 @@ One of the more popular estimators is Mahony's nonlinear complementary filter on
 
 \begin{align}
   \dot{\bm{\hat{q}}} &= \frac{1}{2} \hat{\bm q} \otimes \bm{\bar \omega} \\
-  \dot{\bm{\bar \omega}} &= (\bm{\omega} - \bm{b}) + k_P\bm{\omega}_\text{err} \\
+  \dot{\bm{\bar \omega}} &= (\bm{\omega} - \bm{b}) + k_P\bm{\omega}_\text{err} \label{eq:omega_bar_dynamics} \\
   \dot{\bm{b}} &= -k_I\bm{\omega}_\text{err}
 \end{align}
 
@@ -302,16 +302,28 @@ One of the more popular estimators is Mahony's nonlinear complementary filter on
   \bm{\omega}_\text{err} = \sum v_i \times \hat{v}_i
 \end{align}
 
-\begin{align}
-  \tilde{\bm{q}} &= \hat{\bm q}^{-1} \otimes \bm{q}(\bm{a}) \\
-  \bm{\omega}_\text{err} &= 2 q_w \bm{q}_\text{vec}
-\end{align}
+% \begin{align}
+%   \tilde{\bm{q}} &= \hat{\bm q}^{-1} \otimes \bm{q}(\bm{a}) \\
+%   \bm{\omega}_\text{err} &= 2 q_w \bm{q}_\text{vec}
+% \end{align}
 
 \section*{Autopilot Implementation}
 The Mahony filter is implemented for experimental validation on IMU data.
+The filtering equations are integrated using Euler's method at IMU rate, $\SI{200}{\Hz}$.
 We also incorporate a strategy for implementing external attitude corrections (e.g., from VICON or VIO).
+At the IMU rate, the attitude error is calculated as
+\begin{equation}
+\bm{\omega}_\text{err}^\text{acc} = R^\top \bm{e}_3 \times \frac{\bm{a}}{\|\bm{a}\|}.
+\end{equation}
+When external attitude measurements $\bar{R}$ are available, the following attitude is used instead
+\begin{equation}
+\bm{\omega}_\text{err}^\text{ext} = k_\text{ext}\sum_{i=1}^3 \bar{R}^\top\bm{e}_i\times R^\top\bm{e}_i,
+\end{equation}
+where $k_\text{ext} = F_s^\text{IMU}/F_s^\text{ext}$, the ratio of the IMU sample rate and the external attitude update sample rate.
 
-
+Observe that $k_P$ in equation~\eqref{eq:omega_bar_dynamics} is (for $k_I\approx0$) the cut-off frequency of the complementary filters (c.f., Fig.~\ref{fig:scf_bode}).
+When the accelerometer measurement is used, $k_P$ is set to a low value (i.e., $0.5$) to balance between the infrequent, noisy accelerometer-based attitude updates and the biased gyro measurements.
+However, when the external measurement is used, we set $k_P=1.5$ to reflect our increased confidence in the external attitude update.
 
 \subsection*{Experimental Results}
 
@@ -433,7 +445,7 @@ We also incorporate a strategy for implementing external attitude corrections (e
     \caption{$\omega_\text{err}$}
     \label{fig:scf_bode}
   \end{subfigure}
-  \caption{Results from Test 4.}
+  \caption{Results from Test 5.}
   \label{fig:scf}
 \end{figure}
 

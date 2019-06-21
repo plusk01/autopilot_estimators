@@ -51,7 +51,7 @@ grid on; ylabel('Accel [m/s/s]'); xlabel('Time [s]');
 % Filter Setup
 
 kp = 0.5; ki = 0.05; margin = 0.2; acc_LPF_alpha = 0.8;
-useExtAtt = 1; extAttRate = 15; extAttDropAfter = Inf;
+useExtAtt = 1; extAttRate = 100; extAttDropAfter = Inf;
 useAcc = 1;
 
 % ratio of imu sample rate to extAtt sample rate
