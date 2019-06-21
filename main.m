@@ -7,6 +7,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 clear all; clc;
 set(0,'DefaultLineLineWidth',1); % 0.5
+exfig = 0;
 
 % -------------------------------------------------------------------------
 % Setup
@@ -38,16 +39,19 @@ title('Raw IMU Data');
 plot(imu.t(Ns:Ne), imu.gyro(:,Ns:Ne));
 legend('X','Y','Z');
 grid on; ylabel('Gyro [rad/s]');
-
 subplot(212);
 plot(imu.t(Ns:Ne), imu.accel(:,Ns:Ne));
 grid on; ylabel('Accel [m/s/s]'); xlabel('Time [s]');
+% if exfig
+%     set(gcf, 'Color', 'w');
+%     export_fig('doc/figures/rawimu.pdf','-dCompatibilityLevel=1.5');
+% end
 
 % -------------------------------------------------------------------------
 % Filter Setup
 
 kp = 0.5; ki = 0.05; margin = 0.2; acc_LPF_alpha = 0.8;
-useExtAtt = 1; extAttRate = 100;
+useExtAtt = 1; extAttRate = 15; extAttDropAfter = Inf;
 useAcc = 1;
 
 % ratio of imu sample rate to extAtt sample rate
@@ -140,6 +144,9 @@ for i = 2:length(tvec)
     % find the time-sync'd index of the pose data
     pidx = find(pose.t>=t,1);
     if isempty(pidx), pidx = 0; end
+    
+    % simulate external attitude drop out
+    if t>=extAttDropAfter, pidx = 0; end
     
     % Check if external attitude is yawed
 %     if pidx ~=0
@@ -267,23 +274,39 @@ plot(tvec,mahonyRPY(:,3));
 % plot(rfstate.t,rfstate.RPY(3,:)*180/pi);
 plot(tvec,rfeRPY(:,3));
 xlabel('Time [s]');
+if exfig
+    set(gcf, 'Color', 'w');
+    export_fig('doc/figures/estrpy.pdf','-dCompatibilityLevel=1.5');
+end
 
 I = find(extAttFlags==1);
 scatter(tvec(I),repmat(-7,length(I),1),2)
 
 figure(4), clf;
-subplot(311); grid on; ylabel('halfe'); hold on;
-plot(tvec, halfe); legend('X','Y','Z')
-subplot(312); grid on; ylabel('wacc'); hold on;
+subplot(211); grid on; ylabel('Mahony [Accel Only]'); hold on;
+plot(tvec, 2*halfe); legend('X','Y','Z')
+subplot(212); grid on; ylabel('ROSflight'); hold on;
 plot(tvec, wacc);
-subplot(313); grid on; ylabel('walt'); hold on;
-plot(tvec, walt);
+% subplot(313); grid on; ylabel('walt'); hold on;
+% plot(tvec, walt);
+xlabel('time [s]');
+if exfig
+    set(gcf, 'Color', 'w');
+    export_fig('doc/figures/werr.pdf','-dCompatibilityLevel=1.5');
+end
 
 figure(5), clf;
-subplot(211); grid on; ylabel('MahonyAHRS'); hold on;
-plot(tvec, mahonyintegral); legend('X','Y','Z'); title('Integral Feedback (Bias)');
+subplot(211); grid on; ylabel('Mahony [Accel Only]'); hold on;
+plot(tvec, mahonyintegral); legend('X','Y','Z'); %title('Integral Feedback (Bias)');
+xyaxis = axis;
 subplot(212); grid on; ylabel('ROSflight'); hold on;
 plot(tvec, rfbias);
+axis(xyaxis);
+xlabel('time [s]');
+if exfig
+    set(gcf, 'Color', 'w');
+    export_fig('doc/figures/estbias.pdf','-dCompatibilityLevel=1.5');
+end
 
 function v = clamp(v,u)
     if v>u, v=u; end

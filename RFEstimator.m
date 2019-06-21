@@ -218,6 +218,8 @@ obj.wacc_alt = w_acc;
                 usedExtAtt = 1;
             end
             
+            obj.wacc = w_acc;
+            
             % integrate biases from accel feedback
             if norm(gyro) < obj.SPIN_RATE_LIMIT
                 % only integrate if not spinning too fast

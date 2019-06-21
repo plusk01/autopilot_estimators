@@ -18,6 +18,7 @@
 \usepackage{bm}
 \usepackage{siunitx}
 \usepackage{subcaption}
+\usepackage{float}
 
 \usepackage{graphicx}
 \graphicspath{ {figures/} }
@@ -306,12 +307,143 @@ One of the more popular estimators is Mahony's nonlinear complementary filter on
   \bm{\omega}_\text{err} &= 2 q_w \bm{q}_\text{vec}
 \end{align}
 
-\section*{Things to Read}
+\section*{Autopilot Implementation}
+The Mahony filter is implemented for experimental validation on IMU data.
+We also incorporate a strategy for implementing external attitude corrections (e.g., from VICON or VIO).
+
+
+
+\subsection*{Experimental Results}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.5\textwidth]{rawimu.pdf}
+  \caption{Raw IMU data from non-aggressive HX02 flight.}
+  \label{fig:rawimu}
+\end{figure}
+
+\subsubsection*{Test 1 - Gyro Only}
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}[t]{0.31\textwidth}
+    \includegraphics[width=\textwidth]{estrpy_gyroonly.pdf}
+    \caption{RPY estimates}
+    \label{fig:scf_meas}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.31\textwidth}
+    \includegraphics[width=\textwidth]{estbias_gyroonly.pdf}
+    \caption{Bias estimates}
+    \label{fig:scf_est}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.31\textwidth}
+    \includegraphics[width=\textwidth]{werr_gyroonly.pdf}
+    \caption{$\omega_\text{err}$}
+    \label{fig:scf_bode}
+  \end{subfigure}
+  \caption{Results from Test 1.}
+  \label{fig:scf}
+\end{figure}
+
+\subsubsection*{Test 2 - Gyro + External Attitude at 100 Hz}
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}[t]{0.31\textwidth}
+    \includegraphics[width=\textwidth]{estrpy_ext100.pdf}
+    \caption{RPY estimates}
+    \label{fig:scf_meas}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.31\textwidth}
+    \includegraphics[width=\textwidth]{estbias_ext100.pdf}
+    \caption{Bias estimates}
+    \label{fig:scf_est}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.31\textwidth}
+    \includegraphics[width=\textwidth]{werr_ext100.pdf}
+    \caption{$\omega_\text{err}$}
+    \label{fig:scf_bode}
+  \end{subfigure}
+  \caption{Results from Test 2.}
+  \label{fig:scf}
+\end{figure}
+
+\subsubsection*{Test 3 - Gyro + Accel + External Attitude at 100 Hz}
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}[t]{0.31\textwidth}
+    \includegraphics[width=\textwidth]{estrpy_accel_ext100.pdf}
+    \caption{RPY estimates}
+    \label{fig:scf_meas}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.31\textwidth}
+    \includegraphics[width=\textwidth]{estbias_accel_ext100.pdf}
+    \caption{Bias estimates}
+    \label{fig:scf_est}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.31\textwidth}
+    \includegraphics[width=\textwidth]{werr_accel_ext100.pdf}
+    \caption{$\omega_\text{err}$}
+    \label{fig:scf_bode}
+  \end{subfigure}
+  \caption{Results from Test 3.}
+  \label{fig:scf}
+\end{figure}
+
+\subsubsection*{Test 4 - Gyro + External Attitude at 15 Hz}
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}[t]{0.31\textwidth}
+    \includegraphics[width=\textwidth]{estrpy_ext15.pdf}
+    \caption{RPY estimates}
+    \label{fig:scf_meas}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.31\textwidth}
+    \includegraphics[width=\textwidth]{estbias_ext15.pdf}
+    \caption{Bias estimates}
+    \label{fig:scf_est}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.31\textwidth}
+    \includegraphics[width=\textwidth]{werr_ext15.pdf}
+    \caption{$\omega_\text{err}$}
+    \label{fig:scf_bode}
+  \end{subfigure}
+  \caption{Results from Test 4.}
+  \label{fig:scf}
+\end{figure}
+
+\subsubsection*{Test 5 - Gyro + Accel + External Attitude at 15 Hz}
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}[t]{0.31\textwidth}
+    \includegraphics[width=\textwidth]{estrpy_accel_ext15.pdf}
+    \caption{RPY estimates}
+    \label{fig:scf_meas}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.31\textwidth}
+    \includegraphics[width=\textwidth]{estbias_accel_ext15.pdf}
+    \caption{Bias estimates}
+    \label{fig:scf_est}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.31\textwidth}
+    \includegraphics[width=\textwidth]{werr_accel_ext15.pdf}
+    \caption{$\omega_\text{err}$}
+    \label{fig:scf_bode}
+  \end{subfigure}
+  \caption{Results from Test 4.}
+  \label{fig:scf}
+\end{figure}
+
+\section*{Things to Think About}
 \begin{itemize}
   \item \href{https://arxiv.org/pdf/1602.07733.pdf}{Comparison of Attitude Estimation Techniques for Low-Cost UAVs}
   \item \href{https://en.wikipedia.org/wiki/Wahba%27s_problem}{Wahba's Problem}
   \item \href{https://www.analog.com/media/en/analog-dialogue/volume-46/number-3/articles/analyzing-frequency-response-of-inertial-mems.pdf}{Analyzing Frequency Response of Inertial MEMS}
   \item Keeping a Good Attitude: A Quaternion-Based Orientation Filter for IMUs and MARGs
+  \item \href{https://ocw.mit.edu/courses/aeronautics-and-astronautics/16-333-aircraft-stability-and-control-fall-2004/lecture-notes/lecture_15.pdf}{16.333 Complementary Filters}
 \end{itemize}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
