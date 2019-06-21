@@ -12,14 +12,15 @@ clear all; clc;
 
 % Load flight data
 [imu, state, pose, frame] = readACLBag('HX02', 'bags/acl/imu_hx02.bag');
-% [imu, state, pose, frame] = readRFBag('bags/acl/unity_bigdrag.bag');
-% [imu, state, pose, frame] = readRFBag('bags/rrg/rosflight_some_yaw.bag', 1);
+% [imu, state, pose, frame] = readRFBag('bags/acl/unity.bag');
+% [imu, state, pose, frame] = readRFBag('bags/rrg/rosflight_noNaN_aggressive.bag', 1);
 
 % timing - use IMU as clock
 ts = 0;
 te = Inf;
 Ns = find(imu.t>=ts,1);
-Ne = max([find(imu.t>=te,1) length(imu.t)]);
+Ne = find(imu.t>=te,1);
+if isempty(Ne), Ne = length(imu.t); end
 tvec = imu.t(Ns:Ne);
 
 % start and end indices for pose data
@@ -45,7 +46,7 @@ grid on; ylabel('Accel [m/s/s]'); xlabel('Time [s]');
 % Filter Setup
 
 kp = 0.5; ki = 0.05; margin = 0.2; acc_LPF_alpha = 0.8;
-useExtAtt = 1;
+useExtAtt = 0; extAttRate = 400;
 useAcc = 1;
 
 %
@@ -116,8 +117,11 @@ rfbias = zeros(3,length(tvec));
 dts = zeros(1,length(tvec)-1);
 
 % vis handle for attitude
-figure(10), clf; hold on;
-hViz = viz(Q.Identity, Q.Identity, Q.Identity, zeros(3,1), margin, frame, []);
+viz = 0;
+if viz == 1
+    figure(10), clf; hold on;
+    hViz = viz(Q.Identity, Q.Identity, Q.Identity, zeros(3,1), margin, frame, []);
+end
 
 extAttTimes = zeros(1,length(tvec));
 
@@ -133,6 +137,14 @@ for i = 2:length(tvec)
     pidx = find(pose.t>=t,1);
     if isempty(pidx), pidx = 0; end
     
+    % Check if external attitude is yawed
+%     if pidx ~=0
+%         RPY = quat2eul(pose.quaternion(:,pidx)', 'XYZ');
+%         if rad2deg(RPY(3))>10 || rad2deg(RPY(3))<-10
+%             pidx = 0;
+%         end
+%     end
+    
     %
     % MATLAB Implementation of Mahony Filter
     %
@@ -146,7 +158,7 @@ for i = 2:length(tvec)
     % ROSflight
     %
     
-    if pidx ~= 0 && useExtAtt == 1
+    if pidx ~= 0 && useExtAtt == 1 && mod(i,extAttRate) == 0
         extAttq = pose.quaternion(:,pidx);
         rf.extAttCorrection(extAttq);
     end
@@ -164,10 +176,10 @@ for i = 2:length(tvec)
     % ROSflight MATLAB estimator
     %
     
-    if pidx ~= 0 && useExtAtt == 1 && mod(i,20) == 0
+    if pidx ~= 0 && useExtAtt == 1 && mod(i,extAttRate) == 0
         extAttTimes(i) = 1;
         extAttq = pose.quaternion(:,pidx);
-        rfestimator = rfestimator.extAttCorrection(extAttq);
+        rfestimator = rfestimator.extAttCorrection(extAttq, t);
     end
     
     rfestimator = rfestimator.updateIMU(imu.gyro(:,j), imu.accel(:,j), dt);
@@ -178,7 +190,7 @@ for i = 2:length(tvec)
     
     
     % Visualize attitude and accelerometer measurement
-    if pidx ~= 0 && mod(i,1000) == 0
+    if viz == 1 && pidx ~= 0 && mod(i,1000) == 0
         hViz = viz(qrfe(:,i), qmahony(:,i), pose.quaternion(:,pidx), ...
                         rfestimator.accel_LPF, margin, frame, hViz);
         drawnow;
@@ -215,38 +227,39 @@ plot(tvec, qrfe(4,:));
 xlabel('Time [s]');
 
 % convert quat to RPY
-mahonyRPY = quat2eul(qmahony', 'XYZ')*180/pi;
-viconRPY = quat2eul(pose.quaternion(:,pNs:pNe)', 'XYZ')*180/pi;
-stateRPY = quat2eul(state.quat(:,sNs:sNe)', 'XYZ')*180/pi;
-rfRPY = quat2eul(rfstate.q', 'XYZ')*180/pi;
-rfeRPY = quat2eul(qrfe', 'XYZ')*180/pi;
+seq = 'XYZ';
+mahonyRPY = quat2eul(qmahony', seq)*180/pi;
+viconRPY = quat2eul(pose.quaternion(:,pNs:pNe)', seq)*180/pi;
+stateRPY = quat2eul(state.quat(:,sNs:sNe)', seq)*180/pi;
+rfRPY = quat2eul(rfstate.q', seq)*180/pi;
+rfeRPY = quat2eul(qrfe', seq)*180/pi;
 
 figure(3), clf;
 subplot(311); grid on; ylabel('R'); hold on; legend;
 plot(pose.t(pNs:pNe),viconRPY(:,1),'DisplayName','VICON');
-plot(state.t(sNs:sNe),stateRPY(:,1),'DisplayName','Onboard');
+% plot(state.t(sNs:sNe),stateRPY(:,1),'DisplayName','Onboard');
 plot(tvec,mahonyRPY(:,1),'DisplayName','Mahony');
 % plot(rfstate.t,rfRPY(:,1),'DisplayName','ROSflight');
 % plot(rfstate.t,rfstate.RPY(1,:)*180/pi,'DisplayName','ROSflight (internal)');
 plot(tvec,rfeRPY(:,1),'DisplayName','ROSflight MATLAB');
 subplot(312); grid on; ylabel('P'); hold on;
 plot(pose.t(pNs:pNe),viconRPY(:,2));
-plot(state.t(sNs:sNe),stateRPY(:,2));
+% plot(state.t(sNs:sNe),stateRPY(:,2));
 plot(tvec,mahonyRPY(:,2));
 % plot(rfstate.t,rfRPY(:,2));
 % plot(rfstate.t,rfstate.RPY(2,:)*180/pi);
 plot(tvec,rfeRPY(:,2));
 subplot(313); grid on; ylabel('Y'); hold on;
 plot(pose.t(pNs:pNe),viconRPY(:,3));
-plot(state.t(sNs:sNe),stateRPY(:,3));
+% plot(state.t(sNs:sNe),stateRPY(:,3));
 plot(tvec,mahonyRPY(:,3));
 % plot(rfstate.t,rfRPY(:,3));
 % plot(rfstate.t,rfstate.RPY(3,:)*180/pi);
 plot(tvec,rfeRPY(:,3));
 xlabel('Time [s]');
 
-% I = find(extAttTimes==1);
-% scatter(tvec(I),repmat(-7,length(I),1),5)
+I = find(extAttTimes==1);
+scatter(tvec(I),repmat(-7,length(I),1),5)
 
 figure(4), clf;
 subplot(311); grid on; ylabel('halfe'); hold on;
@@ -256,8 +269,8 @@ plot(tvec, wacc);
 subplot(313); grid on; ylabel('walt'); hold on;
 plot(tvec, walt);
 
-% figure(5), clf;
-% subplot(211); grid on; ylabel('MahonyAHRS'); hold on;
-% plot(tvec, mahonyintegral); legend('X','Y','Z'); title('Integral Feedback');
-% subplot(212); grid on; ylabel('ROSflight'); hold on;
-% plot(tvec, rfbias);
+figure(5), clf;
+subplot(211); grid on; ylabel('MahonyAHRS'); hold on;
+plot(tvec, mahonyintegral); legend('X','Y','Z'); title('Integral Feedback (Bias)');
+subplot(212); grid on; ylabel('ROSflight'); hold on;
+plot(tvec, rfbias);

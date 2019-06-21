@@ -52,6 +52,9 @@ classdef RFEstimator
         extAttq = [1 0 0 0];
         extAttFlag = 0;
         extAttSlerpFlag = 0;
+        extAttDt = 0;
+        extAttTimeLast = 0;
+        extAttCount = 0;
     end
     properties (SetAccess = private, Hidden = true)
         % rotation of a FRD body w.r.t a FLU body (rotates FRD into FLU)
@@ -74,10 +77,18 @@ classdef RFEstimator
             obj.extAttKp = rf.getParam('FILTER_KP_COR');
         end
         
-        function obj = extAttCorrection(obj, quat)
+        function obj = extAttCorrection(obj, quat, t)
             obj.extAttq = quat;
             obj.extAttq(2:4) = obj.rotIn(quat(2:4));
             obj.extAttFlag = 1;
+            
+            dt = t - obj.extAttTimeLast;
+            n = obj.extAttCount;
+            obj.extAttDt = 1/(n+1) * (n*obj.extAttDt + dt);
+            
+            % for next time
+            obj.extAttTimeLast = t;
+            obj.extAttCount = obj.extAttCount + 1;
         end
         
         function obj = updateIMU(obj, gyro, accel, dt)
@@ -129,14 +140,23 @@ classdef RFEstimator
 %                 w_acc = 0.1*Q.boxminus(q_acc_inv, obj.q)';
 %                 w_acc(3) = 0;
                 
-%                 [u, theta] = Q(q_tilde).toAxisAngle();
-%                 w_acc = theta*u;
+                [u, theta] = Q(q_tilde).toAxisAngle();
+                w_acc = theta*u;
 %                 w_acc(3) = 0;
+
+obj.wacc_alt = w_acc;
 
                 w_acc = 2*obj.calcMahonyCorrection(a);
 %                 w_acc(3) = 0;
 
-                obj.wacc_alt = w_acc;
+                R = Q(obj.q).toRotm();
+                w_acc = cross(R(3,:)', a);
+
+%                 R = Q(obj.q).toRotm();
+%                 w_acc = cross(R(3,:)', a);
+%                 err(3) = 0;
+
+%                 obj.wacc_alt = w_acc;
 
             else                
                 fprintf('Skipped! accel mag: %.2f\n', norm(accel));
@@ -160,7 +180,7 @@ classdef RFEstimator
 %                 err = Q.boxminus(obj.q, obj.extAttq);
 %                 err = rosflight.utils.boxminus(obj.extAttq, obj.q);
                 
-                [u, theta] = Q(q_tilde).toAxisAngle();
+%                 [u, theta] = Q(q_tilde).toAxisAngle();
 %                 err = theta*u;
                 
                 % gross way
@@ -186,6 +206,7 @@ classdef RFEstimator
 
                 obj.wacc_alt = err;
 
+%                 w_acc = [0;0;0];
                 w_acc = w_acc + obj.extAttKp*err;
                 fprintf('[MATLAB] extAtt err: %.4f, %.4f, %.4f\n', err(1), err(2), err(3));
             end
@@ -193,10 +214,10 @@ classdef RFEstimator
             % integrate biases from accel feedback
             if norm(gyro) < obj.SPIN_RATE_LIMIT
                 % only integrate if not spinning too fast
-                obj.bias(1) = obj.bias(1) - obj.ki*w_acc(1)*dt;
-                obj.bias(2) = obj.bias(2) - obj.ki*w_acc(2)*dt;
+                obj.bias(1) = obj.bias(1) - obj.ki*w_acc(1)*dt;%obj.extAttDt;
+                obj.bias(2) = obj.bias(2) - obj.ki*w_acc(2)*dt;%obj.extAttDt;
 %                 obj.bias(3) = 0;
-                obj.bias(3) = obj.bias(3) - obj.ki*w_acc(3)*dt;
+                obj.bias(3) = obj.bias(3) - obj.ki*w_acc(3)*dt;%obj.extAttDt;
             end
             
             % handle gyro measurements
@@ -213,6 +234,7 @@ classdef RFEstimator
             
             % build the composite omega vector for kinematic propagation
             wfinal = wbar - obj.bias + obj.kp*w_acc;
+%             wfinal = wbar + obj.kp*w_acc;
             
             % propagate dynamics (only if we've moved)
             if norm(wfinal) > 0

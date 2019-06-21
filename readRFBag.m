@@ -11,7 +11,7 @@ if nargin == 2, isRRG = varargin{1}; else, isRRG = false; end
 bag = rosbag(bagpath);
 
 % Get IMU messages
-bagsel = select(bag, 'Topic', '/imu/data');
+bagsel = select(bag, 'Topic', '/imu/data'); %'interpolate_imu/imu'
 msgs = readMessages(bagsel,'DataFormat','struct'); imuMsg = [msgs{:}];
 tsec = header([imuMsg.Header]);
 tmp = [imuMsg.AngularVelocity]; gX = [tmp.X]; gY = [tmp.Y]; gZ = [tmp.Z];
@@ -32,6 +32,8 @@ pos = [pX' pY' pZ']';
 tmp = [poseMsg.Orientation]; qW=[tmp.W];qX=[tmp.X];qY=[tmp.Y];qZ=[tmp.Z];
 quat = [qW' qX' qY' qZ']';
 pose = struct('t',tsec,'position',pos,'quaternion',quat);
+% quat = zeros(4,length(tsec)); quat(1,:) = 1;
+% pose = struct('t',tsec,'quaternion',quat);
 
 % Get state messages
 bagsel = select(bag, 'Topic', '/attitude');
