@@ -3,6 +3,7 @@
 
 \documentclass[a4paper]{article}
 
+\usepackage[bottom]{footmisc}
 \usepackage{xltxtra}
 \usepackage{amsfonts}
 \usepackage{polyglossia}
@@ -122,7 +123,7 @@ As indicated above, complementary filters are useful for fusing independent nois
 Here, we give an overview of the theory of complementary filters and derive a linear estimator for a kinematic dynamic process with constant bias.
 This theoretical overview follows the discussion in Appendix A of~\citet{Mahony2008}.
 
-\subsubsection*{Preliminary Example: Linear with no dynamics}
+\subsubsection*{Preliminary Discussion: Linear system with no dynamics}
 Consider a time-varying signal $x(t)$ we wish to observe.
 We have two sensors $y_1$ and $y_2$ that measure the signal with additive noise
 \begin{equation}
@@ -140,28 +141,111 @@ Given that we know the noises are complementary in a spectral sense, we can desi
 Filtering each measurement through its corresponding transfer function results in the estimate
 \begin{align}
 \hat{x}(s) &= F_1(s)y_1(s) + F_2(s)y_2(s) \nonumber \\
-           &= F_1(s)\left[x(s) + \mu_1(s)\right] + F_2(s)\left[x(s) + \mu_2(s)\right] \nonumber \\
+           &= F_1(s)\left[x(s) + \mu_1(s)\right] + F_2(s)\left[x(s) + \mu_2(s)\right] \label{eq:scf_estimator} \\
            &= (F_1(s)+F_2(s))x(s) + F_1(s)\mu_1(s) + F_2(s)\mu_2(s) \nonumber \\
-           &= x(s) + F_1(s)\mu_1(s) + F_2(s)\mu_2(s),
+           &= x(s) + F_1(s)\mu_1(s) + F_2(s)\mu_2(s), \label{eq:scf_estimate}
 \end{align}
 where we construct $F_1(s)$ to be low-pass and $F_2(s)$ to be high-pass to appropriately filter out the known spectral content of the disturbances.
 Notice that $x(s)$ is all-pass as desired.
+Recall that a first-order low-pass filter has the frequency response
+\begin{equation}
+H_\text{LPF}(s) = \frac{\omega_c}{s+\omega_c} = \frac{1}{\tau s+1};\qquad\tau=\frac{1}{\omega_c}.
+\end{equation}
+The complement of a LPF is a high-pass filter
+\begin{equation}
+H_\text{HPF}(s) = 1 - H_\text{LPF}(s) = \frac{s}{s+\omega_c} = \frac{\tau s}{\tau s+1}.
+\end{equation}
+Thus, by letting $F_1(s)=H_\text{LPF}(s)$ and $F_2(s)=H_\text{HPF}(s)$, we obtain the desired frequency characteristics.
+
+\subsubsection*{Sampled-Data Implementation}
+While equation~\eqref{eq:scf_estimate} is useful for analysis, we would like to be able to implement this filter as an algorithm in a digital computer.
+This requires implementing equation~\eqref{eq:scf_estimator}, which uses the measurements $y_1$ and $y_2$.
+Here, we will discuss two\footnote{A third way uses the bilinear transform to move from the Laplace domain to the Z-domain, followed by the inverse Z transform.} sampled-data implementations of the vanilla linear complementary filter.
+Both versions start with using the inverse Laplace transform to rewrite equation~\eqref{eq:scf_estimator} as differential equations.
+Once in the time domain, we can perform a zero-order hold on the solution to the differential equation.
+Alternatively, an approximation method can be used such as Euler's method, avoiding the necessity of solving the differential equation.
+
+First, we start with the inverse Laplace transform, starting from equation~\eqref{eq:scf_estimator}
+\begin{align*}
+            \hat{x}(s) &= \frac{\omega_c}{s+\omega_c}y_1(s) + \frac{s}{s+\omega_c}y_2(s) \\
+(s+\omega_c)\hat{x}(s) &= \omega_c y_1(s) + s y_2(s) \\
+           s\hat{x}(s) &= s y_2(s) + \omega_c \left(y_1(s) - \hat{x}(s)\right),
+\end{align*}
+which becomes
+\begin{equation*}
+\dot{\hat x}(t) = \dot{y}_2(t) + \omega_c\left(y_1(t) - \hat{x}(t)\right).
+\end{equation*}
+Note that how this is written, it appears to be a pair of coupled first-order differential equations.
+However, we do not actually know how $y_2(t)$ evolves, and we are interested in the value of the derivative at time $t$, which we can obtain via numerical differentiation.
+For clarity, we will define $y_2^\Delta(t):=\dot{y}_2(t)$, leaving us with
+\begin{equation}
+\dot{\hat x}(t) = -\omega_c\hat{x}(t) + \omega_cy_1(t) + y_2^\Delta(t).
+\end{equation}
+
+\noindent\textbf{1) ZOH.} The zero-order hold method involves solving the differential equation.
+This is not difficult and is left as an exercise to the reader (see Chapter 4.1 of \citet{Beard2017}).
+
+\noindent\textbf{2) Approximation via Euler's Method.} In this case, we approximate the time derivative using the limit definition, giving us
+\begin{align*}
+\frac{\hat{x}_i - \hat{x}_{i-1}}{\Delta t} &= -\omega_c\hat{x}_{i} + \omega_cy_{1,i} + \frac{y_{2,i} - y_{2,i-1}}{\Delta t} \\
+\hat{x}_i &=  -\Delta t\omega_c\hat{x}_{i} + \Delta t \omega_c y_{1,i} + y_{2,i} - y_{2,i-1} + \hat{x}_{i-1} \\
+(1+\Delta t\omega_c)\hat{x}_i &=  \Delta t \omega_c y_{1,i} + y_{2,i} - y_{2,i-1} + \hat{x}_{i-1} \\
+\hat{x}_i &=  \frac{1}{1+\Delta t\omega_c} \left(\Delta t \omega_c y_{1,i} + y_{2,i} - y_{2,i-1} + \hat{x}_{i-1}\right) \\
+          &=  \frac{\Delta t \omega_c}{1+\Delta t\omega_c} y_{1,i} + \frac{1}{1+\Delta t\omega_c}\left(y_{2,i} - y_{2,i-1}\right) + \frac{1}{1+\Delta t\omega_c} \hat{x}_{i-1}.
+\end{align*}
+We can write this compactly as
+\begin{equation}
+\hat{x}_i = \alpha\hat{x}_{i-1} + \alpha\left(y_{2,i} - y_{2,i-1}\right) + (1-\alpha)y_{1,i},
+\end{equation}
+where
+\begin{equation*}
+\begin{split}
+\alpha := \frac{1}{1+\Delta t\omega_c} = \frac{\tau}{\tau+\Delta t}
+\end{split};
+\qquad\qquad
+\begin{split}
+1-\alpha := \frac{\Delta t\omega_c}{1+\Delta t\omega_c} = \frac{\Delta t}{\tau+\Delta t}
+\end{split};
+\qquad\qquad
+\begin{split}
+0\le\alpha\le1
+\end{split}.
+\end{equation*}
+Note that we could have gotten to the same equation by deriving the $\alpha$-LPF and $\alpha$-HPF variants and summing them.
+
+\subsubsection*{Example}
+In this example, we use a sample period of $T_s=\SI{0.001}{\second}$ and take $x(t)=\cos(2\pi f_x t)$, where $f_x=\SI{5}{\Hz}$.
+The disturbances $\mu_1$ and $\mu_2$ are specified as sinusoids with frequencies $20$ times higher and lower, respectively.
+The results are shown in Fig.~\ref{fig:scf_est} for filters designed with a cut-off frequency of $f_c=\SI{1}{\Hz}$ (top) and $f_c=\SI{10}{\Hz}$ (bottom).
+The frequency responses of the two filter designs are shown in Fig.~\ref{fig:scf_bode}, in terms of the complementary filters $F_1(s)$ and $F_2(s)$.
+
+Note how varying the cut-off frequency $f_c$ changes the response of the filter, choosing between rejecting more low-frequency or high-frequency noise.
+Because of the characteristics of the first-order filters used, the transition band is quite wide.
+This results in noise leakage into the estimate when the frequency of the true signal is close to the frequencies of the noise.
+By increasing the ratio of the frequencies, we are able to reconstruct $x(t)$ perfectly.
+
+Specifically, when the cut-off frequency is close to the low-frequency disturbance ($\mu_2$), high-frequency noise is heavily attenuated, but low-frequency noise is not as much.
+The opposite holds true when the cut-off frequency is close to the high-frequency disturbance ($\mu_1$).
+This translates to a choice of $\alpha$ small ($f_c$ large) allowing more high-frequency noise, while $\alpha$ large ($f_c$ small) allows more low-frequency noise.
 
 \begin{figure}[h]
   \centering
   \begin{subfigure}[t]{0.32\textwidth}
     \includegraphics[width=\textwidth]{scf_meas.pdf}
     \caption{Measurements of $x(t)$.}
-  \end{subfigure}
+    \label{fig:scf_meas}
+  \end{subfigure}\hfill
   \begin{subfigure}[t]{0.32\textwidth}
     \includegraphics[width=\textwidth]{scf_est.pdf}
-    \caption{Estimates using different $\omega_c$.}
-  \end{subfigure}
+    \caption{Estimates using different $\omega_c=2\pi f_c$. The true signal $x(t)$ is shown as the dashed black line.}
+    \label{fig:scf_est}
+  \end{subfigure}\hfill
   \begin{subfigure}[t]{0.32\textwidth}
     \includegraphics[width=\textwidth]{scf_bode.pdf}
-    \caption{Bode magnitude plots of $F_1, F_2$ for different $\omega_c$.}
+    \caption{Bode magnitude plots of $F_1, F_2$ for different $\omega_c$. The true signal frequency is shown as the thick black vertical line.}
+    \label{fig:scf_bode}
   \end{subfigure}
-  \caption{Results from an example complementary filter.}
+  \caption{Results from an example complementary filter applied to simulated data.}
   \label{fig:scf}
 \end{figure}
 
