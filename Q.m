@@ -1,6 +1,10 @@
+% Q.m
+% Rotation representations based on quaternions
+% Parker Lusk <parkerclusk@gmail.com>
+% 1 April 2019
+
 classdef Q
     %Q Quaternion class
-    %   Rotation representations based on quaternions
     
     properties
         q % w,x,y,z vector of unit quaternion values
