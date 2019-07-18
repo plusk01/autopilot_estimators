@@ -139,22 +139,19 @@ classdef RFEstimator
 %                 w_acc(3) = 0; % don't correct unobservable z
 %                 w_acc(3) = -2*q_tilde(1)*q_tilde(4);
 
-                obj.wacc = w_acc;
+%                 obj.wacc = w_acc;
 
 %                 w_acc = 0.1*Q.boxminus(q_acc_inv, obj.q)';
 %                 w_acc(3) = 0;
                 
-                [u, theta] = Q(q_tilde).toAxisAngle();
-                w_acc = theta*u;
+%                 [u, theta] = Q(q_tilde).toAxisAngle();
+%                 w_acc = theta*u;
 %                 w_acc(3) = 0;
 
-obj.wacc_alt = w_acc;
+% obj.wacc_alt = w_acc;
 
-                w_acc = 2*obj.calcMahonyCorrection(a);
+                w_acc = -2*obj.calcMahonyCorrection(a);
 %                 w_acc(3) = 0;
-
-                R = Q(obj.q).toRotm();
-                w_acc = cross(R(3,:)', a);
 
 %                 R = Q(obj.q).toRotm();
 %                 w_acc = cross(R(3,:)', a);
@@ -164,7 +161,7 @@ obj.wacc_alt = w_acc;
 
                 usedAccel = 1;
             else                
-                fprintf('Skipped! accel mag: %.2f\n', norm(accel));
+%                 fprintf('Skipped! accel mag: %.2f\n', norm(accel));
             end
             
             % Use external attitude correction
@@ -175,11 +172,11 @@ obj.wacc_alt = w_acc;
             end
             if obj.extAttFlag == 1
                 obj.extAttFlag = 0;
-                
-                q_tilde = Q(Q.inv(obj.q)).mult(obj.extAttq).q;
+
+                q_tilde = Q(Q.inv(obj.extAttq)).mult(obj.q).q;
                 
                 % Correction term
-                err = 2*q_tilde(1)*q_tilde(2:4)';
+                err = -2*q_tilde(1)*q_tilde(2:4)';
 
                 % rosflight way
 %                 err = Q.boxminus(obj.q, obj.extAttq);
@@ -198,22 +195,21 @@ obj.wacc_alt = w_acc;
                 % betaflight/Leishman vector way
                 R = Q(obj.q).toRotm();
                 Rext = Q(obj.extAttq).toRotm();
-                err = -cross(R(3,:)', Rext(3,:)');
-%                 err(3) = 0;
-                
-                err2 = -cross(R(1,:)', Rext(1,:)');
-%                 err2(1) = 0;
-                err = err + err2;
-                
-                err3 = -cross(R(2,:)', Rext(2,:)');
-%                 err3(2) = 0;
-                err = err + err3;
+                err = cross(Rext(1,:)', R(1,:)') + ...
+                      cross(Rext(2,:)', R(2,:)') + ...
+                      cross(Rext(3,:)', R(3,:)');
+                err = err * obj.extAttKp;
 
                 obj.wacc_alt = err;
 
                 w_acc = [0;0;0];
-                w_acc = w_acc + obj.extAttKp*err;
-                fprintf('[MATLAB] extAtt err: %.4f, %.4f, %.4f\n', err(1), err(2), err(3));
+                w_acc = w_acc + err;
+%                 fprintf('-------------------------------------\n')
+%                 fprintf('[ml xext] %.4f %.4f %.4f [xhat] %.4f %.4f %.4f\n',...
+%                         xext_BW(1), xext_BW(2), xext_BW(3), xhat_BW(1), xhat_BW(2), xhat_BW(3));
+%                 crs = obj.mycross(xext_BW,xhat_BW);
+%                 fprintf('[ml cross] %.4f %.4f %.4f\n', crs(1), crs(2), crs(3));
+%                 fprintf('[ml] %.4f, %.4f, %.4f\n', err(1), err(2), err(3));
                 
                 usedExtAtt = 1;
             end
@@ -223,10 +219,9 @@ obj.wacc_alt = w_acc;
             % integrate biases from accel feedback
             if norm(gyro) < obj.SPIN_RATE_LIMIT
                 % only integrate if not spinning too fast
-                obj.bias(1) = obj.bias(1) - obj.ki*w_acc(1)*dt;%obj.extAttDt;
-                obj.bias(2) = obj.bias(2) - obj.ki*w_acc(2)*dt;%obj.extAttDt;
-%                 obj.bias(3) = 0;
-                obj.bias(3) = obj.bias(3) - obj.ki*w_acc(3)*dt;%obj.extAttDt;
+                obj.bias(1) = obj.bias(1) - obj.ki*w_acc(1)*dt;
+                obj.bias(2) = obj.bias(2) - obj.ki*w_acc(2)*dt;
+                obj.bias(3) = obj.bias(3) - obj.ki*w_acc(3)*dt;
             end
             
             % handle gyro measurements
@@ -297,8 +292,9 @@ obj.wacc_alt = w_acc;
         function halfe = calcMahonyCorrection(obj, accel)
             % alternative accel correction term (from MahonyAHRS)
             
-            accel = obj.R_flu_frd*accel;
-            quat  = [obj.q(1);obj.R_flu_frd*obj.q(2:4)']';
+%             accel = obj.R_flu_frd*accel;
+%             quat  = [obj.q(1);obj.R_flu_frd*obj.q(2:4)']';
+            quat  = obj.q;
             
             ax = accel(1); ay = accel(2); az = accel(3);
             q0 = quat(1); q1 = quat(2); q2 = quat(3); q3 = quat(4);
@@ -316,7 +312,7 @@ obj.wacc_alt = w_acc;
             
             halfe = [halfex;halfey;halfez];
             
-            halfe = obj.R_flu_frd'*halfe;
+%             halfe = obj.R_flu_frd'*halfe;
         end
         function obj = runLPF(obj, accel, gyro)
             alpha = obj.acc_LPF_alpha;

@@ -126,7 +126,7 @@ classdef MahonyAHRS
                 gy = gy + twoKp * halfey;
                 gz = gz + twoKp * halfez;
             else
-                fprintf('Skipped! accel mag: %.2f\n', norm(accel));
+%                 fprintf('Skipped! accel mag: %.2f\n', norm(accel));
             end
             
             % apply integral feedback (n.b. MahonyAHRS does this wrong,
