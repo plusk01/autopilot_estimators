@@ -92,7 +92,7 @@ rf.setParam('GYROZ_LPF_ALPHA', 0.0);
 rf.setParam('GYRO_X_BIAS', 0);
 rf.setParam('GYRO_Y_BIAS', 0);
 rf.setParam('GYRO_Z_BIAS', 0);
-rf.setParam('FILTER_KP_COR', clamp(freqRat,200));
+rf.setParam('FILTER_KP_COR', 1.5);
 rf.setTime(tvec(1));
 rf.run();
 

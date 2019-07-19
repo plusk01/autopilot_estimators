@@ -16,8 +16,8 @@ exfig = 0;
 % [imu, state, pose, frame] = readACLBag('HX02', 'bags/acl/imu_hx02.bag');
 % [imu, state, pose, frame] = readACLBag('HX05', 'bags/acl/imu.bag');
 [imu, state, pose, frame] = readMiscBag('bags/rosflight_bias_in_estimator_with_ground_truth.bag');
+% [imu, state, pose, frame] = readRFBag('bags/acl/gazebosil.bag');
 % [imu, state, pose, frame] = readRFBag('bags/acl/unity.bag');
-% [imu, state, pose, frame] = readRFBag('bags/rrg/rosflight_noNaN_aggressive.bag', 1);
 
 % timing - use IMU as clock
 ts = 0;
@@ -29,11 +29,11 @@ tvec = imu.t(Ns:Ne);
 
 % start and end indices for pose data
 pNs = find(pose.t>=ts,1);
-pNe = max([find(pose.t>=te,1) length(pose.t)]);
+pNe = min([find(pose.t>=te,1) length(pose.t)]);
 
 % start and end indices for state data
 sNs = find(state.t>=ts,1);
-sNe = max([find(state.t>=te,1) length(state.t)]);
+sNe = min([find(state.t>=te,1) length(state.t)]);
 
 figure(1), clf;
 subplot(211);
@@ -53,8 +53,8 @@ grid on; ylabel('Accel [m/s/s]'); xlabel('Time [s]');
 %% Filter Setup
 
 kp = 0.5; ki = 0.05; margin = 0.1; acc_LPF_alpha = 0.8;
-useExtAtt = 1; extAttRate = 100; extAttDropAfter = Inf;
-useAcc = 0;
+useExtAtt = 1; extAttRate = 15; extAttDropAfter = Inf;
+useAcc = 1;
 
 % ratio of imu sample rate to extAtt sample rate
 freqRat = (length(tvec)/max(tvec))/extAttRate;
@@ -78,7 +78,7 @@ rf.setParam('GYROZ_LPF_ALPHA', 0.0);
 rf.setParam('GYRO_X_BIAS', 0);
 rf.setParam('GYRO_Y_BIAS', 0);
 rf.setParam('GYRO_Z_BIAS', 0);
-rf.setParam('FILTER_KP_COR', clamp(freqRat,200));
+% rf.setParam('FILTER_KP_COR', 1.5);
 rf.setTime(tvec(1));
 rf.run();
 
@@ -104,16 +104,20 @@ qrfe(:,1) = rfestimator.getQ();
 % -------------------------------------------------------------------------
 % Main Loop
 
-% estimator period over time
-dts = zeros(1,length(tvec)-1);
-
 extAttFlags = zeros(1,length(tvec));
 
 for i = 2:length(tvec)
     t = tvec(i);
     dt = t - tvec(i-1);
-    dts(i-1) = dt;
     
+    % when ROSflight is streaming IMU at 1000 Hz, there
+    % are occasional timestamps that are sent twice.
+    % Don't let this blow up our filter.
+    if dt == 0
+        dt = 0.00001;
+        t = t + dt;
+    end
+
     % extra indexing because we are using a window of the IMU data
     j = Ns+i-1;
     
@@ -135,7 +139,7 @@ for i = 2:length(tvec)
     
     rf.setIMU(imu.gyro(:,j), imu.accel(:,j));
     rf.setTime(t);
-    rf.run(); rf.run(); rf.run(); rf.run()
+    rf.run();
     [q, rpy, omega, ~] = rf.getState();
     rfstate.q(:,i) = q;
     rfstate.RPY(:,i) = rpy;
@@ -166,8 +170,8 @@ figure(2), clf;
 subplot(411); grid on; ylabel('qw'); hold on; legend;
 plot(pose.t(pNs:pNe),pose.quaternion(1,pNs:pNe),'DisplayName','VICON');
 % plot(state.t(sNs:sNe),state.quat(1,sNs:sNe),'DisplayName','Onboard');
-plot(rfstate.t, rfstate.q(1,:),'DisplayName','ROSflight TYPE 1');
-plot(tvec, qrfe(1,:),'DisplayName','ROSflight TYPE 3');
+plot(rfstate.t, rfstate.q(1,:),'DisplayName','ROSflight Current');
+plot(tvec, qrfe(1,:),'DisplayName','ROSflight Proposed');
 subplot(412); grid on; ylabel('qx'); hold on;
 plot(pose.t(pNs:pNe),pose.quaternion(2,pNs:pNe));
 % plot(state.t(sNs:sNe),state.quat(2,sNs:sNe));
@@ -196,32 +200,24 @@ rfeRPY = quat2eul(qrfe', seq)*180/pi;
 figure(3), clf;
 subplot(311); grid on; ylabel('R'); hold on; legend;
 plot(pose.t(pNs:pNe),viconRPY(:,1),'DisplayName','VICON');
+plot(rfstate.t,rfRPY(:,1),'DisplayName','ROSflight Current');
+plot(tvec,rfeRPY(:,1),'DisplayName','ROSflight Proposed');
 % plot(state.t(sNs:sNe),stateRPY(:,1),'DisplayName','Onboard');
-plot(rfstate.t,rfRPY(:,1),'DisplayName','ROSflight TYPE 1');
 % plot(rfstate.t,rfiRPY(:,1),'DisplayName','ROSflight (internal)');
-plot(tvec,rfeRPY(:,1),'DisplayName','ROSflight TYPE 3');
 subplot(312); grid on; ylabel('P'); hold on;
 plot(pose.t(pNs:pNe),viconRPY(:,2));
-% plot(state.t(sNs:sNe),stateRPY(:,2));
 plot(rfstate.t,rfRPY(:,2));
-% plot(rfstate.t,rfiRPY(:,2));
 plot(tvec,rfeRPY(:,2));
+% plot(state.t(sNs:sNe),stateRPY(:,2));
+% plot(rfstate.t,rfiRPY(:,2));
 subplot(313); grid on; ylabel('Y'); hold on;
 plot(pose.t(pNs:pNe),viconRPY(:,3));
-% plot(state.t(sNs:sNe),stateRPY(:,3));
 plot(rfstate.t,rfRPY(:,3));
-% plot(rfstate.t,rfiRPY(:,3));
 plot(tvec,rfeRPY(:,3));
+% plot(state.t(sNs:sNe),stateRPY(:,3));
+% plot(rfstate.t,rfiRPY(:,3));
 xlabel('Time [s]');
 if exfig
     set(gcf, 'Color', 'w');
     export_fig('doc/figures/estrpy.pdf','-dCompatibilityLevel=1.5');
-end
-
-I = find(extAttFlags==1);
-scatter(tvec(I),repmat(-7,length(I),1),2)
-
-function v = clamp(v,u)
-    if v>u, v=u; end
-    if v<-u,v=-u; end
 end

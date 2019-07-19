@@ -48,7 +48,7 @@ classdef RFEstimator
         wacc_alt = [0;0;0]; % alternate (MahonyAHRS) correction term
         
         % external attitude correction
-        extAttKp = 10;
+        extAttKp = 1.5;
         extAttq = [1 0 0 0];
         extAttFlag = 0;
         extAttSlerpFlag = 0;
@@ -74,7 +74,7 @@ classdef RFEstimator
             obj.ki = rf.getParam('FILTER_KI');
             obj.acc_LPF_alpha = rf.getParam('ACC_LPF_ALPHA');
             obj.gyroXY_LPF_alpha = rf.getParam('GYROXY_LPF_ALPHA');
-            obj.extAttKp = rf.getParam('FILTER_KP_COR');
+            obj.extAttKp = 1.5; %rf.getParam('FILTER_KP_COR');
         end
         
         function obj = extAttCorrection(obj, quat, t)
@@ -84,7 +84,7 @@ classdef RFEstimator
             
             dt = t - obj.extAttTimeLast;
             n = obj.extAttCount;
-            obj.extAttDt = 1/(n+1) * (n*obj.extAttDt + dt);
+            obj.extAttDt = dt; % 1/(n+1) * (n*obj.extAttDt + dt);
             
             % for next time
             obj.extAttTimeLast = t;
@@ -198,7 +198,7 @@ classdef RFEstimator
                 err = cross(Rext(1,:)', R(1,:)') + ...
                       cross(Rext(2,:)', R(2,:)') + ...
                       cross(Rext(3,:)', R(3,:)');
-                err = err * obj.extAttKp;
+                err = err * (obj.extAttDt/dt);
 
                 obj.wacc_alt = err;
 
@@ -232,17 +232,13 @@ classdef RFEstimator
             else
                 wbar = gyro;
             end
-            
-%             wbar = zeros(3,1);
-%             wbar(3) = 0;
-            
+
             % select gain
-            kp = obj.kp;
-            if usedExtAtt == 1, kp = 1.5; end
+            if usedExtAtt == 1, kp = obj.extAttKp;
+            else, kp = obj.kp; end
 
             % build the composite omega vector for kinematic propagation
             wfinal = wbar - obj.bias + kp*w_acc;
-%             wfinal = wbar + obj.kp*w_acc;
             
             % propagate dynamics (only if we've moved)
             if norm(wfinal) > 0
@@ -361,3 +357,7 @@ classdef RFEstimator
     end
 end
 
+function v = clamp(v,u)
+    if v>u, v=u; end
+    if v<-u,v=-u; end
+end
