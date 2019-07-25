@@ -13,9 +13,9 @@ exfig = 0;
 % Setup
 
 % Load flight data
-% [imu, state, pose, frame] = readACLBag('HX02', 'bags/acl/imu_hx02.bag');
+[imu, state, pose, frame] = readACLBag('HX02', 'bags/acl/imu_hx02.bag');
 % [imu, state, pose, frame] = readACLBag('HX05', 'bags/acl/imu.bag');
-[imu, state, pose, frame] = readMiscBag('bags/rosflight_bias_in_estimator_with_ground_truth.bag');
+% [imu, state, pose, frame] = readMiscBag('bags/rosflight_bias_in_estimator_with_ground_truth.bag');
 % [imu, state, pose, frame] = readRFBag('bags/acl/gazebosil.bag');
 % [imu, state, pose, frame] = readRFBag('bags/acl/unity.bag');
 

@@ -52,8 +52,8 @@ grid on; ylabel('Accel [m/s/s]'); xlabel('Time [s]');
 %% Filter Setup
 
 kp = 0.5; ki = 0.01; margin = 0.1; acc_LPF_alpha = 0.8;
-useExtAtt = 0; extAttRate = 100; extAttDropAfter = Inf;
-useAcc = 0;
+useExtAtt = 1; extAttRate = 100; extAttDropAfter = Inf;
+useAcc = 1;
 
 % ratio of imu sample rate to extAtt sample rate
 freqRat = (length(tvec)/max(tvec))/extAttRate;
@@ -82,6 +82,7 @@ mahonyintegral = zeros(3,length(tvec));
 rf = rosflight.ROSflight();
 rf.frame = frame;
 rf.setParam('FILTER_USE_ACC', useAcc);
+rf.setParam('FILTER_ACCMARGIN', margin);
 rf.setParam('FILTER_QUAD_INT', 0);
 rf.setParam('FILTER_MAT_EXP', 0);
 rf.setParam('FILTER_KP', kp);
@@ -105,7 +106,7 @@ rfstate.t = zeros(1,length(tvec)); rfstate.t(1) = tvec(1);
 % ROSflight (MATLAB implementation of estimator)
 %
 
-rfestimator = RFEstimator(rf, margin);
+rfestimator = RFEstimator(rf);
 rfestimator.frame = frame;
 
 % initialize with quat from vicon
@@ -221,26 +222,26 @@ figure(2), clf;
 subplot(411); grid on; ylabel('qw'); hold on; legend;
 plot(pose.t(pNs:pNe),pose.quaternion(1,pNs:pNe),'DisplayName','VICON');
 % plot(state.t(sNs:sNe),state.quat(1,sNs:sNe),'DisplayName','Onboard');
-plot(tvec,qmahony(1,:),'DisplayName','Mahony');
-% plot(rfstate.t, rfstate.q(1,:),'DisplayName','ROSflight');
+% plot(tvec,qmahony(1,:),'DisplayName','Mahony');
+plot(rfstate.t, rfstate.q(1,:),'DisplayName','ROSflight');
 plot(tvec, qrfe(1,:),'DisplayName','ROSflight MATLAB');
 subplot(412); grid on; ylabel('qx'); hold on;
 plot(pose.t(pNs:pNe),pose.quaternion(2,pNs:pNe));
 % plot(state.t(sNs:sNe),state.quat(2,sNs:sNe));
-plot(tvec,qmahony(2,:));
-% plot(rfstate.t, rfstate.q(2,:));
+% plot(tvec,qmahony(2,:));
+plot(rfstate.t, rfstate.q(2,:));
 plot(tvec, qrfe(2,:));
 subplot(413); grid on; ylabel('qy'); hold on;
 plot(pose.t(pNs:pNe),pose.quaternion(3,pNs:pNe));
 % plot(state.t(sNs:sNe),state.quat(3,sNs:sNe));
-plot(tvec,qmahony(3,:))
-% plot(rfstate.t, rfstate.q(3,:));
+% plot(tvec,qmahony(3,:))
+plot(rfstate.t, rfstate.q(3,:));
 plot(tvec, qrfe(3,:));
 subplot(414); grid on; ylabel('qz'); hold on;
 plot(pose.t(pNs:pNe),pose.quaternion(4,pNs:pNe));
 % plot(state.t(sNs:sNe),state.quat(4,sNs:sNe));
-plot(tvec,qmahony(4,:));
-% plot(rfstate.t, rfstate.q(4,:));
+% plot(tvec,qmahony(4,:));
+plot(rfstate.t, rfstate.q(4,:));
 plot(tvec, qrfe(4,:));
 xlabel('Time [s]');
 
@@ -256,22 +257,22 @@ figure(3), clf;
 subplot(311); grid on; ylabel('R'); hold on; legend;
 plot(pose.t(pNs:pNe),viconRPY(:,1),'DisplayName','VICON');
 % plot(state.t(sNs:sNe),stateRPY(:,1),'DisplayName','Onboard');
-plot(tvec,mahonyRPY(:,1),'DisplayName','Mahony');
-% plot(rfstate.t,rfRPY(:,1),'DisplayName','ROSflight');
+% plot(tvec,mahonyRPY(:,1),'DisplayName','Mahony');
+plot(rfstate.t,rfRPY(:,1),'DisplayName','ROSflight');
 % plot(rfstate.t,rfstate.RPY(1,:)*180/pi,'DisplayName','ROSflight (internal)');
 plot(tvec,rfeRPY(:,1),'DisplayName','ROSflight MATLAB');
 subplot(312); grid on; ylabel('P'); hold on;
 plot(pose.t(pNs:pNe),viconRPY(:,2));
 % plot(state.t(sNs:sNe),stateRPY(:,2));
-plot(tvec,mahonyRPY(:,2));
-% plot(rfstate.t,rfRPY(:,2));
+% plot(tvec,mahonyRPY(:,2));
+plot(rfstate.t,rfRPY(:,2));
 % plot(rfstate.t,rfstate.RPY(2,:)*180/pi);
 plot(tvec,rfeRPY(:,2));
 subplot(313); grid on; ylabel('Y'); hold on;
 plot(pose.t(pNs:pNe),viconRPY(:,3));
 % plot(state.t(sNs:sNe),stateRPY(:,3));
-plot(tvec,mahonyRPY(:,3));
-% plot(rfstate.t,rfRPY(:,3));
+% plot(tvec,mahonyRPY(:,3));
+plot(rfstate.t,rfRPY(:,3));
 % plot(rfstate.t,rfstate.RPY(3,:)*180/pi);
 plot(tvec,rfeRPY(:,3));
 xlabel('Time [s]');

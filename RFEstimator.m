@@ -62,12 +62,12 @@ classdef RFEstimator
     end
     
     methods
-        function obj = RFEstimator(rf, margin)
+        function obj = RFEstimator(rf)
             %MAHONYAHRS Construct an instance of this class
             %   Detailed explanation goes here
-            obj.margin = margin;
             
             obj.useAcc = rf.getParam('FILTER_USE_ACC');
+            obj.margin = rf.getParam('FILTER_ACCMARGIN');
             obj.quadInt = rf.getParam('FILTER_QUAD_INT');
             obj.expMat = rf.getParam('FILTER_MAT_EXP');
             obj.kp = rf.getParam('FILTER_KP');
