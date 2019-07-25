@@ -85,7 +85,8 @@ rf.setParam('FILTER_USE_ACC', useAcc);
 rf.setParam('FILTER_ACCMARGIN', margin);
 rf.setParam('FILTER_QUAD_INT', 0);
 rf.setParam('FILTER_MAT_EXP', 0);
-rf.setParam('FILTER_KP', kp);
+rf.setParam('FILTER_KP_ACC', kp);
+rf.setParam('FILTER_KP_EXT', 1.5);
 rf.setParam('FILTER_KI', ki);
 rf.setParam('ACC_LPF_ALPHA', acc_LPF_alpha);
 rf.setParam('GYROXY_LPF_ALPHA', 0.0);
@@ -93,7 +94,6 @@ rf.setParam('GYROZ_LPF_ALPHA', 0.0);
 rf.setParam('GYRO_X_BIAS', 0);
 rf.setParam('GYRO_Y_BIAS', 0);
 rf.setParam('GYRO_Z_BIAS', 0);
-rf.setParam('FILTER_KP_COR', 1.5);
 rf.setTime(tvec(1));
 rf.run();
 

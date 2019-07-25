@@ -70,11 +70,11 @@ classdef RFEstimator
             obj.margin = rf.getParam('FILTER_ACCMARGIN');
             obj.quadInt = rf.getParam('FILTER_QUAD_INT');
             obj.expMat = rf.getParam('FILTER_MAT_EXP');
-            obj.kp = rf.getParam('FILTER_KP');
+            obj.kp = rf.getParam('FILTER_KP_ACC');
+            obj.extAttKp = rf.getParam('FILTER_KP_EXT');
             obj.ki = rf.getParam('FILTER_KI');
             obj.acc_LPF_alpha = rf.getParam('ACC_LPF_ALPHA');
             obj.gyroXY_LPF_alpha = rf.getParam('GYROXY_LPF_ALPHA');
-            obj.extAttKp = 1.5; %rf.getParam('FILTER_KP_COR');
         end
         
         function obj = extAttCorrection(obj, quat, t)
